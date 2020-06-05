@@ -1,7 +1,11 @@
 include(FindPkgConfig)
 pkg_check_modules(GSTMM REQUIRED gstreamermm-1.0)
 
-add_executable(${PROJECT_NAME} main.cpp)
+add_executable(${PROJECT_NAME} main.cpp exceptions.h ITranscoderListener.h
+                               Transcoder.h Transcoder.cpp
+                               Encoder.h Encoder.cpp
+                               WebmEncoder.h WebmEncoder.cpp
+                               Mp4Encoder.h Mp4Encoder.cpp)
 target_configure_cxx_checks(${PROJECT_NAME})
 
 target_include_directories(${PROJECT_NAME} PRIVATE "${GSTMM_INCLUDE_DIRS}")
