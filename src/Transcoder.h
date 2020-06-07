@@ -18,25 +18,14 @@
  */
 #pragma once
 
-#include "Encoder.h"
-#include "ITranscoderListener.h"
-#include <atomic>
-#include <mutex>
-#include <vector>
+#include "encoders/Encoder.h"
+#include <glibmm/main.h>
 
-class Transcoder final
+class Transcoder final : public IPlayerListener
 {
   public:
-    enum class ErrorCode : int
-    {
-        undefined,
-        cannotInitializeOutputTee,
-        cannotRequestTeePad
-    };
-    static const GQuark errorDomain;
-
-    Transcoder();
-    ~Transcoder();
+    static std::shared_ptr<Transcoder> create(int argc, char** argv);
+    ~Transcoder() = default;
 
     Transcoder(const Transcoder&) = delete;
     Transcoder& operator=(const Transcoder&) = delete;
@@ -46,55 +35,18 @@ class Transcoder final
     void addEncoder(const std::shared_ptr<Encoder>& encoder);
     void clearEncoders();
 
-    void addTranscoderListener(const std::shared_ptr<ITranscoderListener>& listener) noexcept;
-    void removeTranscoderListener(const std::shared_ptr<ITranscoderListener>& listener) noexcept;
+    void transcode(const Glib::ustring& uri);
+    void interruptTranscoding() noexcept;
 
-    void startTranscoding(const Glib::ustring& uri);
-    void stopTranscoding() noexcept;
+    void onPlayerPrerolled(Player& player) final;
+    void onPlayerPlaying(Player& player) noexcept final;
+    void onPlayerStopped(Player& player, bool isInterrupted) noexcept final;
+    void onPipelineIssue(Player& player, bool isFatalError, const Glib::Error& error,
+                         const std::string& debugMessage) noexcept final;
 
   private:
-    Glib::RefPtr<Gst::Pipeline> m_pipeline;
-    unsigned int m_busWatchId;
-    Glib::RefPtr<Gst::UriDecodeBin> m_uriDecodeBin;
-    std::atomic_int m_prerollingPads;
-    std::atomic_bool m_prerollDone;
-
-    struct Connector
-    {
-        Glib::RefPtr<Gst::Tee> outputTee;
-        Glib::RefPtr<Gst::Pad> decoderPad;
-        unsigned long blockingProbeId;
-        GstStreamType type;
-    };
-    std::vector<Connector> m_connectors;
-    std::mutex m_connectorsWriteLock;
-
+    Transcoder();
+    Player m_player;
+    Glib::RefPtr<Glib::MainLoop> m_mainLoop;
     std::vector<std::shared_ptr<Encoder>> m_encoders;
-    std::vector<std::weak_ptr<ITranscoderListener>> m_listeners;
-
-    enum class State
-    {
-        undefined,
-        prerolled,
-        transcoding,
-        stopped
-    };
-    State m_currentState;
-    State m_pendingState;
-    bool m_interrupted;
-
-    void onPadAdded(const Glib::RefPtr<Gst::Pad>& pad) noexcept;
-    void onPadPrerolled() noexcept;
-    void onConfigurePipeline() noexcept;
-
-    bool hasStableState(State state) const noexcept;
-    bool onBusMessage(const Glib::RefPtr<Gst::Bus>& bus, const Glib::RefPtr<Gst::Message>& message) noexcept;
-
-    void triggerTranscodingStarted() noexcept;
-    void triggerTranscodingStopped() noexcept;
-    void triggerTranscodingIssue(bool isFatalError, const Glib::Error& error) noexcept;
-
-    bool prepareEncoders() noexcept;
-    bool connectEncoders() noexcept;
-    void disconnectEncoders() noexcept;
 };

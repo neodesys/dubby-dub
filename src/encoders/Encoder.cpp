@@ -1,6 +1,5 @@
-
 #include "Encoder.h"
-#include "exceptions.h"
+#include "../exceptions.h"
 #include <cassert>
 
 const GQuark Encoder::errorDomain = Glib::Quark("EncoderErrorDomain");
@@ -21,7 +20,7 @@ Encoder::Encoder()
 
 Encoder::~Encoder()
 {
-    cleanupAfterEncoding();
+    cleanupEncoder();
 }
 
 void Encoder::setOutputFile(const Glib::ustring& file) noexcept
@@ -51,75 +50,40 @@ void Encoder::setAudioSampleRate(int rate) noexcept
     m_audioSampleRate = (rate > 0) ? rate : sameAsSource;
 }
 
-bool Encoder::prepareEncoding(const Glib::RefPtr<Gst::Pipeline>& pipeline) noexcept
+void Encoder::onPlayerPrerolled(Player& player)
 {
-    try
+    // Add encoder elements to pipeline.
+    player.getPipeline()->add(m_encodeBin)->add(m_fileSink);
+    m_encodeBin->link(m_fileSink);
+
+    m_fileSink->property_location() = m_outputFile;
+    m_encodeBin->property_profile() = createEncodingProfile();
+
+    if (!m_encodeBin->sync_state_with_parent() || !m_fileSink->sync_state_with_parent())
     {
-        pipeline->add(m_encodeBin)->add(m_fileSink);
-        m_encodeBin->link(m_fileSink);
+        throw InvalidStateException();
+    }
 
-        m_fileSink->property_location() = m_outputFile;
-        m_encodeBin->property_profile() = createEncodingProfile();
-
-        if (!m_encodeBin->sync_state_with_parent() || !m_fileSink->sync_state_with_parent())
+    // Connect encoder to player.
+    player.forEachConnector([this](Connector& connector) {
+        Glib::RefPtr<Gst::Pad> sinkPad;
+        if ((connector.getStreamType() & GST_STREAM_TYPE_VIDEO) != 0)
         {
-            throw InvalidStateException();
+            sinkPad = this->m_encodeBin->get_request_pad("video_%u");
+        }
+        else if ((connector.getStreamType() & GST_STREAM_TYPE_AUDIO) != 0)
+        {
+            sinkPad = this->m_encodeBin->get_request_pad("audio_%u");
+        }
+        else
+        {
+            return;
         }
 
-        return true;
-    }
-    catch (const std::exception& e)
-    {
-        cleanupAfterEncoding();
-        pipeline->get_bus()->post(
-            Gst::MessageError::create(m_encodeBin,
-                                      Glib::Error(errorDomain, static_cast<int>(ErrorCode::cannotAddToPipeline),
-                                                  "cannot add encoder to pipeline"),
-                                      e.what()));
-        return false;
-    }
-}
+        connector.connect(sinkPad);
+    });
 
-bool Encoder::linkPad(const Glib::RefPtr<Gst::Pad>& pad, bool isVideoPad) noexcept
-{
-    auto pipeline = Glib::RefPtr<Gst::Pipeline>::cast_static(m_encodeBin->get_parent());
-    assert(pipeline); // NOLINT
-
-    Glib::RefPtr<Gst::Pad> sinkPad;
-    if (isVideoPad)
-    {
-        sinkPad = m_encodeBin->get_request_pad("video_%u");
-    }
-    else
-    {
-        sinkPad = m_encodeBin->get_request_pad("audio_%u");
-    }
-
-    if (!sinkPad || (pad->link(sinkPad) != Gst::PAD_LINK_OK))
-    {
-        const char* cause = "encoder sink pad request failed";
-        if (sinkPad)
-        {
-            cause = "link to encoder sink pad failed";
-            m_encodeBin->release_request_pad(sinkPad);
-        }
-
-        pipeline->get_bus()->post(
-            Gst::MessageError::create(m_encodeBin,
-                                      Glib::Error(errorDomain, static_cast<int>(ErrorCode::cannotLinkStream),
-                                                  "cannot link raw stream to encoder"),
-                                      cause));
-        return false;
-    }
-
-    return true;
-}
-
-void Encoder::configureEncoders() noexcept
-{
-    auto pipeline = Glib::RefPtr<Gst::Pipeline>::cast_static(m_encodeBin->get_parent());
-    assert(pipeline); // NOLINT
-
+    // Configure codecs.
     auto it = m_encodeBin->iterate_elements();
     while (it.next() == Gst::ITERATOR_OK)
     {
@@ -134,7 +98,7 @@ void Encoder::configureEncoders() noexcept
                 }
                 catch (const std::exception& e)
                 {
-                    pipeline->get_bus()->post(Gst::MessageWarning::create(
+                    player.getPipeline()->get_bus()->post(Gst::MessageWarning::create(
                         *it,
                         Glib::Error(errorDomain, static_cast<int>(ErrorCode::cannotConfigureVideoEncoder),
                                     "cannot configure video encoder"),
@@ -149,7 +113,7 @@ void Encoder::configureEncoders() noexcept
                 }
                 catch (const std::exception& e)
                 {
-                    pipeline->get_bus()->post(Gst::MessageWarning::create(
+                    player.getPipeline()->get_bus()->post(Gst::MessageWarning::create(
                         *it,
                         Glib::Error(errorDomain, static_cast<int>(ErrorCode::cannotConfigureAudioEncoder),
                                     "cannot configure audio encoder"),
@@ -160,38 +124,30 @@ void Encoder::configureEncoders() noexcept
     }
 }
 
-void Encoder::cleanupAfterEncoding() noexcept
+void Encoder::onPlayerPlaying(Player& /*player*/) noexcept
 {
-    m_encodeBin->set_state(Gst::STATE_NULL);
-    m_fileSink->set_state(Gst::STATE_NULL);
+    // Empty method.
+}
 
-    auto parent = Glib::RefPtr<Gst::Bin>::cast_static(m_encodeBin->get_parent());
-    if (parent)
-    {
-        parent->remove(m_encodeBin);
-    }
+void Encoder::onPlayerStopped(Player& /*player*/, bool /*isInterrupted*/) noexcept
+{
+    cleanupEncoder();
+}
 
-    parent = Glib::RefPtr<Gst::Bin>::cast_static(m_fileSink->get_parent());
-    if (parent)
-    {
-        parent->remove(m_fileSink);
-    }
-
-    auto it = m_encodeBin->iterate_sink_pads();
-    while (it.next() == Gst::ITERATOR_OK)
-    {
-        m_encodeBin->release_request_pad(*it);
-    }
+void Encoder::onPipelineIssue(Player& /*player*/, bool /*isFatalError*/, const Glib::Error& /*error*/,
+                              const std::string& /*debugMessage*/) noexcept
+{
+    // Empty method.
 }
 
 void Encoder::onConfigureVideoEncoder(const Glib::RefPtr<Gst::Element>& /*element*/)
 {
-    // Empty default implementation
+    // Empty default implementation.
 }
 
 void Encoder::onConfigureAudioEncoder(const Glib::RefPtr<Gst::Element>& /*element*/)
 {
-    // Empty default implementation
+    // Empty default implementation.
 }
 
 Glib::RefPtr<Gst::Caps> Encoder::getVideoCaps() const noexcept
@@ -237,14 +193,44 @@ Glib::RefPtr<Gst::EncodingProfile> Encoder::createEncodingProfile() const
     GstEncodingContainerProfile* profile = gst_encoding_container_profile_new(nullptr, nullptr, caps->gobj(), nullptr);
 
     caps = Gst::Caps::create_from_string(getVideoType());
-    gst_encoding_container_profile_add_profile(
-        profile, reinterpret_cast<GstEncodingProfile*>( // NOLINT
-                     gst_encoding_video_profile_new(caps->gobj(), nullptr, getVideoCaps()->gobj(), 0)));
+    if (!(bool)gst_encoding_container_profile_add_profile(
+            profile, reinterpret_cast<GstEncodingProfile*>( // NOLINT
+                         gst_encoding_video_profile_new(caps->gobj(), nullptr, getVideoCaps()->gobj(), 0))))
+    {
+        throw CannotCreateEncodingProfileException();
+    }
 
     caps = Gst::Caps::create_from_string(getAudioType());
-    gst_encoding_container_profile_add_profile(
-        profile, reinterpret_cast<GstEncodingProfile*>( // NOLINT
-                     gst_encoding_audio_profile_new(caps->gobj(), nullptr, getAudioCaps()->gobj(), 0)));
+    if (!(bool)gst_encoding_container_profile_add_profile(
+            profile, reinterpret_cast<GstEncodingProfile*>( // NOLINT
+                         gst_encoding_audio_profile_new(caps->gobj(), nullptr, getAudioCaps()->gobj(), 0))))
+    {
+        throw CannotCreateEncodingProfileException();
+    }
 
     return Glib::wrap(reinterpret_cast<GstEncodingProfile*>(profile)); // NOLINT
+}
+
+void Encoder::cleanupEncoder() noexcept
+{
+    m_encodeBin->set_state(Gst::STATE_NULL);
+    m_fileSink->set_state(Gst::STATE_NULL);
+
+    auto parent = Glib::RefPtr<Gst::Bin>::cast_static(m_encodeBin->get_parent());
+    if (parent)
+    {
+        parent->remove(m_encodeBin);
+    }
+
+    parent = Glib::RefPtr<Gst::Bin>::cast_static(m_fileSink->get_parent());
+    if (parent)
+    {
+        parent->remove(m_fileSink);
+    }
+
+    auto it = m_encodeBin->iterate_sink_pads();
+    while (it.next() == Gst::ITERATOR_OK)
+    {
+        m_encodeBin->release_request_pad(*it);
+    }
 }

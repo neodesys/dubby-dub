@@ -18,16 +18,16 @@
  */
 #pragma once
 
-#include <glibmm.h>
+#include "Player.h"
 
-class Transcoder;
-
-class ITranscoderListener
+class IPlayerListener
 {
   public:
-    virtual ~ITranscoderListener() = default;
+    virtual ~IPlayerListener() = default;
 
-    virtual void onTranscodingStarted(Transcoder& transcoder) noexcept = 0;
-    virtual void onTranscodingStopped(Transcoder& transcoder, bool isInterrupted) noexcept = 0;
-    virtual void onTranscodingIssue(Transcoder& transcoder, bool isFatalError, const Glib::Error& error) noexcept = 0;
+    virtual void onPlayerPrerolled(Player& player) = 0;
+    virtual void onPlayerPlaying(Player& player) noexcept = 0;
+    virtual void onPlayerStopped(Player& player, bool isInterrupted) noexcept = 0;
+    virtual void onPipelineIssue(Player& player, bool isFatalError, const Glib::Error& error,
+                                 const std::string& debugMessage) noexcept = 0;
 };

@@ -2,7 +2,7 @@
 
 const char* Mp4Encoder::getContainerType() const noexcept
 {
-    return "video/mp4";
+    return "video/quicktime,variant=iso";
 }
 
 const char* Mp4Encoder::getVideoType() const noexcept

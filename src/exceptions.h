@@ -38,20 +38,29 @@ class InvalidStateException final : public std::exception
     }
 };
 
-class NoEncoderException final : public std::exception
-{
-  public:
-    const char* what() const noexcept
-    {
-        return "no encoder available";
-    }
-};
-
 class CannotLinkPadException final : public std::exception
 {
   public:
     const char* what() const noexcept
     {
         return "cannot link pad";
+    }
+};
+
+class CannotCreateEncodingProfileException final : public std::exception
+{
+  public:
+    const char* what() const noexcept
+    {
+        return "cannot create encoding profile";
+    }
+};
+
+class NoEncoderException final : public std::exception
+{
+  public:
+    const char* what() const noexcept
+    {
+        return "no encoder available";
     }
 };

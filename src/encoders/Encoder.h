@@ -18,16 +18,14 @@
  */
 #pragma once
 
-#include <gstreamermm.h>
+#include "../player/IPlayerListener.h"
 
-class Encoder
+class Encoder : public IPlayerListener
 {
   public:
     enum class ErrorCode : int
     {
         undefined,
-        cannotAddToPipeline,
-        cannotLinkStream,
         cannotConfigureVideoEncoder,
         cannotConfigureAudioEncoder
     };
@@ -50,10 +48,11 @@ class Encoder
     void setAudioChannels(int n = sameAsSource) noexcept;
     void setAudioSampleRate(int rate = sameAsSource) noexcept;
 
-    bool prepareEncoding(const Glib::RefPtr<Gst::Pipeline>& pipeline) noexcept;
-    bool linkPad(const Glib::RefPtr<Gst::Pad>& pad, bool isVideoPad) noexcept;
-    void configureEncoders() noexcept;
-    void cleanupAfterEncoding() noexcept;
+    void onPlayerPrerolled(Player& player) final;
+    void onPlayerPlaying(Player& player) noexcept final;
+    void onPlayerStopped(Player& player, bool isInterrupted) noexcept final;
+    void onPipelineIssue(Player& player, bool isFatalError, const Glib::Error& error,
+                         const std::string& debugMessage) noexcept final;
 
   protected:
     virtual const char* getContainerType() const noexcept = 0;
@@ -80,4 +79,5 @@ class Encoder
     Glib::RefPtr<Gst::Caps> getAudioCaps() const noexcept;
 
     Glib::RefPtr<Gst::EncodingProfile> createEncodingProfile() const;
+    void cleanupEncoder() noexcept;
 };
