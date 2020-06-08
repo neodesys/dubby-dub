@@ -18,9 +18,10 @@
  */
 #pragma once
 
+#include "../ISerializable.h"
 #include "../player/IPlayerListener.h"
 
-class Encoder : public IPlayerListener
+class Encoder : public IPlayerListener, public ISerializable
 {
   public:
     enum class ErrorCode : int
@@ -32,8 +33,10 @@ class Encoder : public IPlayerListener
     static const GQuark errorDomain;
     static const int sameAsSource;
 
+    static std::shared_ptr<Encoder> createEncoder(const std::string& type);
+
     Encoder();
-    virtual ~Encoder();
+    virtual ~Encoder() override;
 
     Encoder(const Encoder&) = delete;
     Encoder& operator=(const Encoder&) = delete;
@@ -43,7 +46,7 @@ class Encoder : public IPlayerListener
     void setOutputFile(const Glib::ustring& file) noexcept;
 
     void setVideoDimensions(int width = sameAsSource, int height = sameAsSource) noexcept;
-    void setVideoFramerate(int numerator = sameAsSource, int denominator = 1) noexcept;
+    void setVideoFrameRate(int numerator = sameAsSource, int denominator = 1) noexcept;
 
     void setAudioChannels(int n = sameAsSource) noexcept;
     void setAudioSampleRate(int rate = sameAsSource) noexcept;
@@ -53,6 +56,9 @@ class Encoder : public IPlayerListener
     void onPlayerStopped(Player& player, bool isInterrupted) noexcept final;
     void onPipelineIssue(Player& player, bool isFatalError, const Glib::Error& error,
                          const std::string& debugMessage) noexcept final;
+
+    Json serialize() const override;
+    void unserialize(const Json& in) override;
 
   protected:
     virtual const char* getContainerType() const noexcept = 0;
@@ -70,8 +76,8 @@ class Encoder : public IPlayerListener
 
     int m_videoWidth;
     int m_videoHeight;
-    int m_framerateNumerator;
-    int m_framerateDenominator;
+    int m_frameRateNumerator;
+    int m_frameRateDenominator;
     Glib::RefPtr<Gst::Caps> getVideoCaps() const noexcept;
 
     int m_audioChannels;

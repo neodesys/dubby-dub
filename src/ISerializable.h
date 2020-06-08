@@ -18,18 +18,16 @@
  */
 #pragma once
 
-#include "Encoder.h"
+#include <nlohmann/json.hpp>
+using Json = nlohmann::json;
 
-class WebmEncoder final : public Encoder
+class ISerializable
 {
   public:
-    static const char* const type;
+    static constexpr const char* typeKey = "type";
 
-    Json serialize() const final;
-    void unserialize(const Json& in) final;
+    virtual ~ISerializable() = default;
 
-  protected:
-    const char* getContainerType() const noexcept final;
-    const char* getVideoType() const noexcept final;
-    const char* getAudioType() const noexcept final;
+    virtual Json serialize() const = 0;
+    virtual void unserialize(const Json& in) = 0;
 };

@@ -17,8 +17,6 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include "Transcoder.h"
-#include "encoders/Mp4Encoder.h"
-#include "encoders/WebmEncoder.h"
 #include <cstdio>
 #include <iostream>
 
@@ -44,21 +42,28 @@ int main(int argc, char* argv[])
             },
             stdinChannel, Glib::IO_IN);
 
-        auto webm = std::make_shared<WebmEncoder>();
-        webm->setOutputFile("./out.webm");
-        webm->setVideoDimensions(320);   // NOLINT
-        webm->setVideoFramerate(25);     // NOLINT
-        webm->setAudioChannels(2);       // NOLINT
-        webm->setAudioSampleRate(44100); // NOLINT
-        transcoder->addEncoder(std::move(webm));
-
-        auto mp4 = std::make_shared<Mp4Encoder>();
-        mp4->setOutputFile("./out.mp4");
-        mp4->setVideoDimensions(480);   // NOLINT
-        mp4->setVideoFramerate(30);     // NOLINT
-        mp4->setAudioChannels(1);       // NOLINT
-        mp4->setAudioSampleRate(22050); // NOLINT
-        transcoder->addEncoder(std::move(mp4));
+        auto config = R"({
+            "type": "transcoder",
+            "encoders": [
+                {
+                    "type": "webm",
+                    "file": "./out.webm",
+                    "width": 640,
+                    "framerate": 25,
+                    "channels": 2,
+                    "samplerate": 44100
+                },
+                {
+                    "type": "mp4",
+                    "file": "./out.mp4",
+                    "width": 320,
+                    "framerate": [50, 3],
+                    "channels": 1,
+                    "samplerate": 22050
+                }
+            ]
+        })"_json;
+        transcoder->unserialize(config);
 
         transcoder->transcode("https://upload.wikimedia.org/wikipedia/commons/transcoded/c/c0/Big_Buck_Bunny_4K.webm/"
                               "Big_Buck_Bunny_4K.webm.480p.vp9.webm");

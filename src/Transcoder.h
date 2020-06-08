@@ -21,11 +21,13 @@
 #include "encoders/Encoder.h"
 #include <glibmm/main.h>
 
-class Transcoder final : public IPlayerListener
+class Transcoder final : public IPlayerListener, public ISerializable
 {
   public:
+    static const char* const type;
+
     static std::shared_ptr<Transcoder> create(int argc, char** argv);
-    ~Transcoder() = default;
+    ~Transcoder() final = default;
 
     Transcoder(const Transcoder&) = delete;
     Transcoder& operator=(const Transcoder&) = delete;
@@ -43,6 +45,9 @@ class Transcoder final : public IPlayerListener
     void onPlayerStopped(Player& player, bool isInterrupted) noexcept final;
     void onPipelineIssue(Player& player, bool isFatalError, const Glib::Error& error,
                          const std::string& debugMessage) noexcept final;
+
+    Json serialize() const final;
+    void unserialize(const Json& in) final;
 
   private:
     Transcoder();

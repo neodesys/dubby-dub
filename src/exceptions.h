@@ -64,3 +64,12 @@ class NoEncoderException final : public std::exception
         return "no encoder available";
     }
 };
+
+class InvalidTypeException final : public std::exception
+{
+  public:
+    const char* what() const noexcept
+    {
+        return "invalid type";
+    }
+};

@@ -1,13 +1,56 @@
-#include "Encoder.h"
+/**
+ * dubby-dub
+ *
+ * Copyright (C) 2020, Loïc Le Page
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
 #include "../exceptions.h"
-#include <cassert>
+#include "Mp4Encoder.h"
+#include "WebmEncoder.h"
+
+namespace
+{
+constexpr const char* outputFileKey = "file";
+constexpr const char* videoWidthKey = "width";
+constexpr const char* videoHeightKey = "height";
+constexpr const char* frameRateKey = "framerate";
+constexpr const char* audioChannelsKey = "channels";
+constexpr const char* audioSampleRateKey = "samplerate";
+} // namespace
 
 const GQuark Encoder::errorDomain = Glib::Quark("EncoderErrorDomain");
 const int Encoder::sameAsSource = -1;
 
+std::shared_ptr<Encoder> Encoder::createEncoder(const std::string& type)
+{
+    if (type == Mp4Encoder::type)
+    {
+        return std::make_shared<Mp4Encoder>();
+    }
+
+    if (type == WebmEncoder::type)
+    {
+        return std::make_shared<WebmEncoder>();
+    }
+
+    throw InvalidTypeException();
+}
+
 Encoder::Encoder()
-    : m_videoWidth(sameAsSource), m_videoHeight(sameAsSource), m_framerateNumerator(sameAsSource),
-      m_framerateDenominator(1), m_audioChannels(sameAsSource), m_audioSampleRate(sameAsSource)
+    : m_videoWidth(sameAsSource), m_videoHeight(sameAsSource), m_frameRateNumerator(sameAsSource),
+      m_frameRateDenominator(1), m_audioChannels(sameAsSource), m_audioSampleRate(sameAsSource)
 {
     m_encodeBin = Gst::EncodeBin::create();
     m_fileSink = Gst::FileSink::create();
@@ -34,10 +77,10 @@ void Encoder::setVideoDimensions(int width, int height) noexcept
     m_videoHeight = (height > 0) ? height : sameAsSource;
 }
 
-void Encoder::setVideoFramerate(int numerator, int denominator) noexcept
+void Encoder::setVideoFrameRate(int numerator, int denominator) noexcept
 {
-    m_framerateNumerator = (numerator > 0) ? numerator : sameAsSource;
-    m_framerateDenominator = (denominator > 0) ? denominator : 1;
+    m_frameRateNumerator = (numerator > 0) ? numerator : sameAsSource;
+    m_frameRateDenominator = (denominator > 0) ? denominator : 1;
 }
 
 void Encoder::setAudioChannels(int n) noexcept
@@ -140,6 +183,104 @@ void Encoder::onPipelineIssue(Player& /*player*/, bool /*isFatalError*/, const G
     // Empty method.
 }
 
+Json Encoder::serialize() const
+{
+    Json obj = Json::object();
+    if (!m_outputFile.empty())
+    {
+        obj[outputFileKey] = m_outputFile.c_str();
+    }
+
+    if (m_videoWidth != sameAsSource)
+    {
+        obj[videoWidthKey] = m_videoWidth;
+    }
+
+    if (m_videoHeight != sameAsSource)
+    {
+        obj[videoHeightKey] = m_videoHeight;
+    }
+
+    if (m_frameRateNumerator != sameAsSource)
+    {
+        if (m_frameRateDenominator != 1)
+        {
+            obj[frameRateKey] = {m_frameRateNumerator, m_frameRateDenominator};
+        }
+        else
+        {
+            obj[frameRateKey] = m_frameRateNumerator;
+        }
+    }
+
+    if (m_audioChannels != sameAsSource)
+    {
+        obj[audioChannelsKey] = m_audioChannels;
+    }
+
+    if (m_audioSampleRate != sameAsSource)
+    {
+        obj[audioSampleRateKey] = m_audioSampleRate;
+    }
+
+    return obj;
+}
+
+void Encoder::unserialize(const Json& in)
+{
+    if (in.contains(outputFileKey))
+    {
+        setOutputFile(in.at(outputFileKey).get<std::string>());
+    }
+    else
+    {
+        setOutputFile("");
+    }
+
+    int width = sameAsSource;
+    int height = sameAsSource;
+    if (in.contains(videoWidthKey))
+    {
+        width = in.at(videoWidthKey).get<int>();
+    }
+    if (in.contains(videoHeightKey))
+    {
+        height = in.at(videoHeightKey).get<int>();
+    }
+    setVideoDimensions(width, height);
+
+    int numerator = sameAsSource;
+    int denominator = 1;
+    if (in.contains(frameRateKey))
+    {
+        const Json& entry = in.at(frameRateKey);
+        if (entry.is_array())
+        {
+            numerator = entry[0].get<int>();
+            denominator = entry[1].get<int>();
+        }
+        else
+        {
+            numerator = entry.get<int>();
+        }
+    }
+    setVideoFrameRate(numerator, denominator);
+
+    int channels = sameAsSource;
+    if (in.contains(audioChannelsKey))
+    {
+        channels = in.at(audioChannelsKey).get<int>();
+    }
+    setAudioChannels(channels);
+
+    int sampleRate = sameAsSource;
+    if (in.contains(audioSampleRateKey))
+    {
+        sampleRate = in.at(audioSampleRateKey).get<int>();
+    }
+    setAudioSampleRate(sampleRate);
+}
+
 void Encoder::onConfigureVideoEncoder(const Glib::RefPtr<Gst::Element>& /*element*/)
 {
     // Empty default implementation.
@@ -163,9 +304,9 @@ Glib::RefPtr<Gst::Caps> Encoder::getVideoCaps() const noexcept
         data.set_field("height", m_videoHeight);
     }
 
-    if (m_framerateNumerator != sameAsSource)
+    if (m_frameRateNumerator != sameAsSource)
     {
-        data.set_field("framerate", Gst::Fraction(m_framerateNumerator, m_framerateDenominator));
+        data.set_field("framerate", Gst::Fraction(m_frameRateNumerator, m_frameRateDenominator));
     }
 
     return Gst::Caps::create(data);

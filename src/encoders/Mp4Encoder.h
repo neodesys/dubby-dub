@@ -22,6 +22,12 @@
 
 class Mp4Encoder final : public Encoder
 {
+  public:
+    static const char* const type;
+
+    Json serialize() const final;
+    void unserialize(const Json& in) final;
+
   protected:
     const char* getContainerType() const noexcept final;
     const char* getVideoType() const noexcept final;
