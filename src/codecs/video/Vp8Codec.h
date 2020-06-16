@@ -16,24 +16,22 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-#include "WebmEncoder.h"
-#include "../codecs/audio/OpusCodec.h"
-#include "../codecs/audio/VorbisCodec.h"
-#include "../codecs/video/Vp8Codec.h"
-#include "../codecs/video/Vp9Codec.h"
-#include <cstring>
+#pragma once
 
-const char* WebmEncoder::getMimeType() const noexcept
-{
-    return "video/webm";
-}
+#include "../BitrateOrQualityCodec.h"
 
-bool WebmEncoder::isVideoCodecAccepted(const char* codecType) const noexcept
+class Vp8Codec final : public BitrateOrQualityCodec
 {
-    return ((std::strcmp(codecType, Vp8Codec::type) == 0) || (std::strcmp(codecType, Vp9Codec::type) == 0));
-}
+  public:
+    static constexpr const char* type = "vp8";
 
-bool WebmEncoder::isAudioCodecAccepted(const char* codecType) const noexcept
-{
-    return ((std::strcmp(codecType, OpusCodec::type) == 0) || (std::strcmp(codecType, VorbisCodec::type) == 0));
-}
+    static void forceSoftwareEncoding(bool force) noexcept;
+
+    const char* getType() const noexcept final
+    {
+        return Vp8Codec::type;
+    }
+
+    const char* getMimeType() const noexcept final;
+    void configureElement(const Glib::ustring& factoryName, const Glib::RefPtr<Gst::Element>& element) const final;
+};

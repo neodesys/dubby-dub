@@ -17,38 +17,23 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include "Mp4Encoder.h"
-#include "../exceptions.h"
+#include "../codecs/audio/AacCodec.h"
+#include "../codecs/audio/Mp3Codec.h"
+#include "../codecs/video/H264Codec.h"
+#include "../codecs/video/H265Codec.h"
+#include <cstring>
 
-const char* const Mp4Encoder::type = "mp4";
-
-Json Mp4Encoder::serialize() const
-{
-    Json obj = Encoder::serialize();
-    obj[ISerializable::typeKey] = Mp4Encoder::type;
-    return obj;
-}
-
-void Mp4Encoder::unserialize(const Json& in)
-{
-    if (in.at(ISerializable::typeKey).get<std::string>() != Mp4Encoder::type)
-    {
-        throw InvalidTypeException();
-    }
-
-    Encoder::unserialize(in);
-}
-
-const char* Mp4Encoder::getContainerType() const noexcept
+const char* Mp4Encoder::getMimeType() const noexcept
 {
     return "video/quicktime,variant=iso";
 }
 
-const char* Mp4Encoder::getVideoType() const noexcept
+bool Mp4Encoder::isVideoCodecAccepted(const char* codecType) const noexcept
 {
-    return "video/x-h265";
+    return ((std::strcmp(codecType, H264Codec::type) == 0) || (std::strcmp(codecType, H265Codec::type) == 0));
 }
 
-const char* Mp4Encoder::getAudioType() const noexcept
+bool Mp4Encoder::isAudioCodecAccepted(const char* codecType) const noexcept
 {
-    return "audio/mpeg";
+    return ((std::strcmp(codecType, AacCodec::type) == 0) || (std::strcmp(codecType, Mp3Codec::type) == 0));
 }

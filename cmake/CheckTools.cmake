@@ -57,6 +57,7 @@ endif()
 
 function(target_configure_cxx_checks TARGET_NAME)
     set_target_properties(${TARGET_NAME} PROPERTIES
+                          CXX_STANDARD 17
                           CXX_EXTENSIONS OFF)
     if(CLANG_FORMAT_CLI)
         get_target_property(TARGET_SOURCES ${TARGET_NAME} SOURCES)

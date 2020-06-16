@@ -16,24 +16,23 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-#include "WebmEncoder.h"
+#include "OggEncoder.h"
 #include "../codecs/audio/OpusCodec.h"
 #include "../codecs/audio/VorbisCodec.h"
-#include "../codecs/video/Vp8Codec.h"
-#include "../codecs/video/Vp9Codec.h"
+#include "../codecs/video/TheoraCodec.h"
 #include <cstring>
 
-const char* WebmEncoder::getMimeType() const noexcept
+const char* OggEncoder::getMimeType() const noexcept
 {
-    return "video/webm";
+    return "application/ogg";
 }
 
-bool WebmEncoder::isVideoCodecAccepted(const char* codecType) const noexcept
+bool OggEncoder::isVideoCodecAccepted(const char* codecType) const noexcept
 {
-    return ((std::strcmp(codecType, Vp8Codec::type) == 0) || (std::strcmp(codecType, Vp9Codec::type) == 0));
+    return (std::strcmp(codecType, TheoraCodec::type) == 0);
 }
 
-bool WebmEncoder::isAudioCodecAccepted(const char* codecType) const noexcept
+bool OggEncoder::isAudioCodecAccepted(const char* codecType) const noexcept
 {
     return ((std::strcmp(codecType, OpusCodec::type) == 0) || (std::strcmp(codecType, VorbisCodec::type) == 0));
 }

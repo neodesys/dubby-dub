@@ -17,7 +17,9 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include "../exceptions.h"
+#include "MkvEncoder.h"
 #include "Mp4Encoder.h"
+#include "OggEncoder.h"
 #include "WebmEncoder.h"
 
 namespace
@@ -28,16 +30,27 @@ constexpr const char* videoHeightKey = "height";
 constexpr const char* frameRateKey = "framerate";
 constexpr const char* audioChannelsKey = "channels";
 constexpr const char* audioSampleRateKey = "samplerate";
+constexpr const char* videoCodecKey = "video";
+constexpr const char* audioCodecKey = "audio";
 } // namespace
 
 const GQuark Encoder::errorDomain = Glib::Quark("EncoderErrorDomain");
-const int Encoder::sameAsSource = -1;
 
 std::shared_ptr<Encoder> Encoder::createEncoder(const std::string& type)
 {
+    if (type == MkvEncoder::type)
+    {
+        return std::make_shared<MkvEncoder>();
+    }
+
     if (type == Mp4Encoder::type)
     {
         return std::make_shared<Mp4Encoder>();
+    }
+
+    if (type == OggEncoder::type)
+    {
+        return std::make_shared<OggEncoder>();
     }
 
     if (type == WebmEncoder::type)
@@ -93,8 +106,43 @@ void Encoder::setAudioSampleRate(int rate) noexcept
     m_audioSampleRate = (rate > 0) ? rate : sameAsSource;
 }
 
+void Encoder::setVideoCodec(const std::shared_ptr<Codec>& codec)
+{
+    if (isVideoCodecAccepted(codec->getType()))
+    {
+        m_videoCodec = codec;
+    }
+    else
+    {
+        throw InvalidTypeException();
+    }
+}
+
+void Encoder::setAudioCodec(const std::shared_ptr<Codec>& codec)
+{
+    if (isAudioCodecAccepted(codec->getType()))
+    {
+        m_audioCodec = codec;
+    }
+    else
+    {
+        throw InvalidTypeException();
+    }
+}
+
+void Encoder::clearCodecs() noexcept
+{
+    m_videoCodec.reset();
+    m_audioCodec.reset();
+}
+
 void Encoder::onPlayerPrerolled(Player& player)
 {
+    if (!m_videoCodec && !m_audioCodec)
+    {
+        throw NoCodecException();
+    }
+
     // Add encoder elements to pipeline.
     player.getPipeline()->add(m_encodeBin)->add(m_fileSink);
     m_encodeBin->link(m_fileSink);
@@ -110,11 +158,11 @@ void Encoder::onPlayerPrerolled(Player& player)
     // Connect encoder to player.
     player.forEachConnector([this](Connector& connector) {
         Glib::RefPtr<Gst::Pad> sinkPad;
-        if ((connector.getStreamType() & GST_STREAM_TYPE_VIDEO) != 0)
+        if (this->m_videoCodec && ((connector.getStreamType() & GST_STREAM_TYPE_VIDEO) != 0))
         {
             sinkPad = this->m_encodeBin->get_request_pad("video_%u");
         }
-        else if ((connector.getStreamType() & GST_STREAM_TYPE_AUDIO) != 0)
+        else if (this->m_audioCodec && ((connector.getStreamType() & GST_STREAM_TYPE_AUDIO) != 0))
         {
             sinkPad = this->m_encodeBin->get_request_pad("audio_%u");
         }
@@ -133,33 +181,34 @@ void Encoder::onPlayerPrerolled(Player& player)
         auto factory = it->get_factory();
         if (factory)
         {
-            if ((bool)g_type_is_a(factory->get_element_type(), GST_TYPE_VIDEO_ENCODER))
+            if (m_videoCodec && static_cast<bool>(g_type_is_a(factory->get_element_type(), GST_TYPE_VIDEO_ENCODER)))
             {
                 try
                 {
-                    onConfigureVideoEncoder(*it);
+                    m_videoCodec->configureElement(factory->get_name(), *it);
                 }
                 catch (const std::exception& e)
                 {
                     player.getPipeline()->get_bus()->post(Gst::MessageWarning::create(
                         *it,
-                        Glib::Error(errorDomain, static_cast<int>(ErrorCode::cannotConfigureVideoEncoder),
-                                    "cannot configure video encoder"),
+                        Glib::Error(errorDomain, static_cast<int>(ErrorCode::cannotConfigureVideoCodec),
+                                    "cannot configure video codec"),
                         e.what()));
                 }
             }
-            else if ((bool)g_type_is_a(factory->get_element_type(), GST_TYPE_AUDIO_ENCODER))
+            else if (m_audioCodec &&
+                     static_cast<bool>(g_type_is_a(factory->get_element_type(), GST_TYPE_AUDIO_ENCODER)))
             {
                 try
                 {
-                    onConfigureAudioEncoder(*it);
+                    m_audioCodec->configureElement(factory->get_name(), *it);
                 }
                 catch (const std::exception& e)
                 {
                     player.getPipeline()->get_bus()->post(Gst::MessageWarning::create(
                         *it,
-                        Glib::Error(errorDomain, static_cast<int>(ErrorCode::cannotConfigureAudioEncoder),
-                                    "cannot configure audio encoder"),
+                        Glib::Error(errorDomain, static_cast<int>(ErrorCode::cannotConfigureAudioCodec),
+                                    "cannot configure audio codec"),
                         e.what()));
                 }
             }
@@ -186,6 +235,8 @@ void Encoder::onPipelineIssue(Player& /*player*/, bool /*isFatalError*/, const G
 Json Encoder::serialize() const
 {
     Json obj = Json::object();
+    obj[ISerializable::typeKey] = getType();
+
     if (!m_outputFile.empty())
     {
         obj[outputFileKey] = m_outputFile.c_str();
@@ -223,11 +274,26 @@ Json Encoder::serialize() const
         obj[audioSampleRateKey] = m_audioSampleRate;
     }
 
+    if (m_videoCodec)
+    {
+        obj[videoCodecKey] = m_videoCodec->serialize();
+    }
+
+    if (m_audioCodec)
+    {
+        obj[audioCodecKey] = m_audioCodec->serialize();
+    }
+
     return obj;
 }
 
 void Encoder::unserialize(const Json& in)
 {
+    if (in.at(ISerializable::typeKey).get<std::string>() != getType())
+    {
+        throw InvalidTypeException();
+    }
+
     if (in.contains(outputFileKey))
     {
         setOutputFile(in.at(outputFileKey).get<std::string>());
@@ -279,16 +345,23 @@ void Encoder::unserialize(const Json& in)
         sampleRate = in.at(audioSampleRateKey).get<int>();
     }
     setAudioSampleRate(sampleRate);
-}
 
-void Encoder::onConfigureVideoEncoder(const Glib::RefPtr<Gst::Element>& /*element*/)
-{
-    // Empty default implementation.
-}
+    clearCodecs();
+    if (in.contains(videoCodecKey))
+    {
+        const auto& entry = in.at(videoCodecKey);
+        auto codec = Codec::createCodec(entry.at(ISerializable::typeKey).get<std::string>());
+        codec->unserialize(entry);
+        setVideoCodec(codec);
+    }
 
-void Encoder::onConfigureAudioEncoder(const Glib::RefPtr<Gst::Element>& /*element*/)
-{
-    // Empty default implementation.
+    if (in.contains(audioCodecKey))
+    {
+        const auto& entry = in.at(audioCodecKey);
+        auto codec = Codec::createCodec(entry.at(ISerializable::typeKey).get<std::string>());
+        codec->unserialize(entry);
+        setAudioCodec(codec);
+    }
 }
 
 Glib::RefPtr<Gst::Caps> Encoder::getVideoCaps() const noexcept
@@ -330,23 +403,29 @@ Glib::RefPtr<Gst::Caps> Encoder::getAudioCaps() const noexcept
 
 Glib::RefPtr<Gst::EncodingProfile> Encoder::createEncodingProfile() const
 {
-    auto caps = Gst::Caps::create_from_string(getContainerType());
+    auto caps = Gst::Caps::create_from_string(getMimeType());
     GstEncodingContainerProfile* profile = gst_encoding_container_profile_new(nullptr, nullptr, caps->gobj(), nullptr);
 
-    caps = Gst::Caps::create_from_string(getVideoType());
-    if (!(bool)gst_encoding_container_profile_add_profile(
-            profile, reinterpret_cast<GstEncodingProfile*>( // NOLINT
-                         gst_encoding_video_profile_new(caps->gobj(), nullptr, getVideoCaps()->gobj(), 0))))
+    if (m_videoCodec)
     {
-        throw CannotCreateEncodingProfileException();
+        caps = Gst::Caps::create_from_string(m_videoCodec->getMimeType());
+        if (!static_cast<bool>(gst_encoding_container_profile_add_profile(
+                profile, reinterpret_cast<GstEncodingProfile*>( // NOLINT
+                             gst_encoding_video_profile_new(caps->gobj(), nullptr, getVideoCaps()->gobj(), 0)))))
+        {
+            throw CannotCreateEncodingProfileException();
+        }
     }
 
-    caps = Gst::Caps::create_from_string(getAudioType());
-    if (!(bool)gst_encoding_container_profile_add_profile(
-            profile, reinterpret_cast<GstEncodingProfile*>( // NOLINT
-                         gst_encoding_audio_profile_new(caps->gobj(), nullptr, getAudioCaps()->gobj(), 0))))
+    if (m_audioCodec)
     {
-        throw CannotCreateEncodingProfileException();
+        caps = Gst::Caps::create_from_string(m_audioCodec->getMimeType());
+        if (!static_cast<bool>(gst_encoding_container_profile_add_profile(
+                profile, reinterpret_cast<GstEncodingProfile*>( // NOLINT
+                             gst_encoding_audio_profile_new(caps->gobj(), nullptr, getAudioCaps()->gobj(), 0)))))
+        {
+            throw CannotCreateEncodingProfileException();
+        }
     }
 
     return Glib::wrap(reinterpret_cast<GstEncodingProfile*>(profile)); // NOLINT

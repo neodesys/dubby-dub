@@ -5,12 +5,14 @@ Checks:
     clang-analyzer-*,
     bugprone-*,
     cppcoreguidelines-*,
+    -cppcoreguidelines-avoid-magic-numbers,
     misc-*,
     modernize-*,
     -modernize-use-trailing-return-type,
     performance-*,
     portability-*,
-    readability-*
+    readability-*,
+    -readability-magic-numbers
 WarningsAsErrors: '*'
 HeaderFilterRegex: '.*'
 AnalyzeTemporaryDtors: false

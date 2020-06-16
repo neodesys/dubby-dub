@@ -25,11 +25,10 @@ namespace
 constexpr const char* encodersKey = "encoders";
 } // namespace
 
-const char* const Transcoder::type = "transcoder";
-
-std::shared_ptr<Transcoder> Transcoder::create(int argc, char** argv)
+std::shared_ptr<Transcoder> Transcoder::create(int argc, char** argv, bool forceSoftwareEncoding)
 {
     Gst::init(argc, argv);
+    Codec::forceSoftwareEncoding(forceSoftwareEncoding);
     std::shared_ptr<Transcoder> transcoder(new Transcoder());
     transcoder->m_player.addPlayerListener(transcoder);
     return transcoder;

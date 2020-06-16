@@ -65,6 +65,24 @@ class NoEncoderException final : public std::exception
     }
 };
 
+class NoCodecException final : public std::exception
+{
+  public:
+    const char* what() const noexcept
+    {
+        return "no codec available";
+    }
+};
+
+class UnknownCodecElementException final : public std::exception
+{
+  public:
+    const char* what() const noexcept
+    {
+        return "unknown codec element";
+    }
+};
+
 class InvalidTypeException final : public std::exception
 {
   public:

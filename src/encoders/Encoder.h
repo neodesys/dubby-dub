@@ -18,7 +18,7 @@
  */
 #pragma once
 
-#include "../ISerializable.h"
+#include "../codecs/Codec.h"
 #include "../player/IPlayerListener.h"
 
 class Encoder : public IPlayerListener, public ISerializable
@@ -27,11 +27,11 @@ class Encoder : public IPlayerListener, public ISerializable
     enum class ErrorCode : int
     {
         undefined,
-        cannotConfigureVideoEncoder,
-        cannotConfigureAudioEncoder
+        cannotConfigureVideoCodec,
+        cannotConfigureAudioCodec
     };
     static const GQuark errorDomain;
-    static const int sameAsSource;
+    static constexpr int sameAsSource = -1;
 
     static std::shared_ptr<Encoder> createEncoder(const std::string& type);
 
@@ -51,6 +51,10 @@ class Encoder : public IPlayerListener, public ISerializable
     void setAudioChannels(int n = sameAsSource) noexcept;
     void setAudioSampleRate(int rate = sameAsSource) noexcept;
 
+    void setVideoCodec(const std::shared_ptr<Codec>& codec);
+    void setAudioCodec(const std::shared_ptr<Codec>& codec);
+    void clearCodecs() noexcept;
+
     void onPlayerPrerolled(Player& player) final;
     void onPlayerPlaying(Player& player) noexcept final;
     void onPlayerStopped(Player& player, bool isInterrupted) noexcept final;
@@ -61,16 +65,16 @@ class Encoder : public IPlayerListener, public ISerializable
     void unserialize(const Json& in) override;
 
   protected:
-    virtual const char* getContainerType() const noexcept = 0;
-    virtual const char* getVideoType() const noexcept = 0;
-    virtual const char* getAudioType() const noexcept = 0;
-
-    virtual void onConfigureVideoEncoder(const Glib::RefPtr<Gst::Element>& element);
-    virtual void onConfigureAudioEncoder(const Glib::RefPtr<Gst::Element>& element);
+    virtual const char* getType() const noexcept = 0;
+    virtual const char* getMimeType() const noexcept = 0;
+    virtual bool isVideoCodecAccepted(const char* codecType) const noexcept = 0;
+    virtual bool isAudioCodecAccepted(const char* codecType) const noexcept = 0;
 
   private:
     Glib::RefPtr<Gst::EncodeBin> m_encodeBin;
     Glib::RefPtr<Gst::FileSink> m_fileSink;
+    std::shared_ptr<Codec> m_videoCodec;
+    std::shared_ptr<Codec> m_audioCodec;
 
     Glib::ustring m_outputFile;
 

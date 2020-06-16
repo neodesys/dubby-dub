@@ -16,24 +16,29 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-#include "WebmEncoder.h"
-#include "../codecs/audio/OpusCodec.h"
-#include "../codecs/audio/VorbisCodec.h"
-#include "../codecs/video/Vp8Codec.h"
-#include "../codecs/video/Vp9Codec.h"
-#include <cstring>
+#pragma once
 
-const char* WebmEncoder::getMimeType() const noexcept
-{
-    return "video/webm";
-}
+#include "BitrateCodec.h"
 
-bool WebmEncoder::isVideoCodecAccepted(const char* codecType) const noexcept
+class BitrateOrQualityCodec : public BitrateCodec
 {
-    return ((std::strcmp(codecType, Vp8Codec::type) == 0) || (std::strcmp(codecType, Vp9Codec::type) == 0));
-}
+  public:
+    enum class EncodingMode : int
+    {
+        defaultValue = defaultValue,
+        bitrate,
+        quality
+    };
 
-bool WebmEncoder::isAudioCodecAccepted(const char* codecType) const noexcept
-{
-    return ((std::strcmp(codecType, OpusCodec::type) == 0) || (std::strcmp(codecType, VorbisCodec::type) == 0));
-}
+    BitrateOrQualityCodec();
+
+    void setEncodingMode(EncodingMode mode = EncodingMode::defaultValue) noexcept;
+    void setQuality(int percent = defaultValue) noexcept;
+
+    Json serialize() const override;
+    void unserialize(const Json& in) override;
+
+  protected:
+    EncodingMode m_encodingMode;
+    int m_qualityInPercent;
+};

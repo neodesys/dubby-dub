@@ -51,7 +51,16 @@ int main(int argc, char* argv[])
                     "width": 640,
                     "framerate": 25,
                     "channels": 2,
-                    "samplerate": 44100
+                    "samplerate": 44100,
+                    "video": {
+                        "type": "vp9",
+                        "mode": "quality",
+                        "quality": 80
+                    },
+                    "audio": {
+                        "type": "vorbis",
+                        "quality": 100
+                    }
                 },
                 {
                     "type": "mp4",
@@ -59,7 +68,16 @@ int main(int argc, char* argv[])
                     "width": 320,
                     "framerate": [50, 3],
                     "channels": 1,
-                    "samplerate": 22050
+                    "samplerate": 22050,
+                    "video": {
+                        "type": "h264",
+                        "mode": "quality",
+                        "quality": 50
+                    },
+                    "audio": {
+                        "type": "aac",
+                        "bitrate": 56
+                    }
                 }
             ]
         })"_json;

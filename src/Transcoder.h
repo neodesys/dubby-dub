@@ -24,9 +24,9 @@
 class Transcoder final : public IPlayerListener, public ISerializable
 {
   public:
-    static const char* const type;
+    static constexpr const char* type = "transcoder";
 
-    static std::shared_ptr<Transcoder> create(int argc, char** argv);
+    static std::shared_ptr<Transcoder> create(int argc, char** argv, bool forceSoftwareEncoding = false);
     ~Transcoder() final = default;
 
     Transcoder(const Transcoder&) = delete;

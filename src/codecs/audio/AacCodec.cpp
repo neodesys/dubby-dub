@@ -16,24 +16,33 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
-#include "WebmEncoder.h"
-#include "../codecs/audio/OpusCodec.h"
-#include "../codecs/audio/VorbisCodec.h"
-#include "../codecs/video/Vp8Codec.h"
-#include "../codecs/video/Vp9Codec.h"
-#include <cstring>
+#include "AacCodec.h"
+#include "../../exceptions.h"
+#include <algorithm>
 
-const char* WebmEncoder::getMimeType() const noexcept
+namespace
 {
-    return "video/webm";
+constexpr int minBitrate = 1;
+constexpr int maxBitrate = 320;
+constexpr int defaultBitrate = 128;
+} // namespace
+
+const char* AacCodec::getMimeType() const noexcept
+{
+    return "audio/mpeg,mpegversion=4";
 }
 
-bool WebmEncoder::isVideoCodecAccepted(const char* codecType) const noexcept
+void AacCodec::configureElement(const Glib::ustring& factoryName, const Glib::RefPtr<Gst::Element>& element) const
 {
-    return ((std::strcmp(codecType, Vp8Codec::type) == 0) || (std::strcmp(codecType, Vp9Codec::type) == 0));
-}
+    const int bitrate =
+        (m_bitrateInKbps != defaultValue) ? std::clamp(m_bitrateInKbps, minBitrate, maxBitrate) : defaultBitrate;
 
-bool WebmEncoder::isAudioCodecAccepted(const char* codecType) const noexcept
-{
-    return ((std::strcmp(codecType, OpusCodec::type) == 0) || (std::strcmp(codecType, VorbisCodec::type) == 0));
+    if (factoryName == "voaacenc")
+    {
+        element->set_property("bitrate", bitrate * 1000);
+    }
+    else
+    {
+        throw UnknownCodecElementException();
+    }
 }

@@ -23,13 +23,15 @@
 class WebmEncoder final : public Encoder
 {
   public:
-    static const char* const type;
-
-    Json serialize() const final;
-    void unserialize(const Json& in) final;
+    static constexpr const char* type = "webm";
 
   protected:
-    const char* getContainerType() const noexcept final;
-    const char* getVideoType() const noexcept final;
-    const char* getAudioType() const noexcept final;
+    const char* getType() const noexcept final
+    {
+        return WebmEncoder::type;
+    }
+
+    const char* getMimeType() const noexcept final;
+    bool isVideoCodecAccepted(const char* codecType) const noexcept final;
+    bool isAudioCodecAccepted(const char* codecType) const noexcept final;
 };
