@@ -25,12 +25,12 @@ class Mp4Encoder final : public Encoder
   public:
     static constexpr const char* type = "mp4";
 
-  protected:
     const char* getType() const noexcept final
     {
         return Mp4Encoder::type;
     }
 
+  protected:
     const char* getMimeType() const noexcept final;
     bool isVideoCodecAccepted(const char* codecType) const noexcept final;
     bool isAudioCodecAccepted(const char* codecType) const noexcept final;

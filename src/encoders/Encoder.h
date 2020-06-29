@@ -43,6 +43,7 @@ class Encoder : public IPlayerListener, public ISerializable
     Encoder(Encoder&&) = default;
     Encoder& operator=(Encoder&&) = default;
 
+    virtual const char* getType() const noexcept = 0;
     void setOutputFile(const Glib::ustring& file) noexcept;
 
     void setVideoDimensions(int width = sameAsSource, int height = sameAsSource) noexcept;
@@ -65,7 +66,6 @@ class Encoder : public IPlayerListener, public ISerializable
     void unserialize(const Json& in) override;
 
   protected:
-    virtual const char* getType() const noexcept = 0;
     virtual const char* getMimeType() const noexcept = 0;
     virtual bool isVideoCodecAccepted(const char* codecType) const noexcept = 0;
     virtual bool isAudioCodecAccepted(const char* codecType) const noexcept = 0;

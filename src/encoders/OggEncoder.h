@@ -25,12 +25,12 @@ class OggEncoder final : public Encoder
   public:
     static constexpr const char* type = "ogg";
 
-  protected:
     const char* getType() const noexcept final
     {
         return OggEncoder::type;
     }
 
+  protected:
     const char* getMimeType() const noexcept final;
     bool isVideoCodecAccepted(const char* codecType) const noexcept final;
     bool isAudioCodecAccepted(const char* codecType) const noexcept final;

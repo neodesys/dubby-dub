@@ -90,6 +90,25 @@ void Transcoder::interruptTranscoding() noexcept
     m_player.stop();
 }
 
+float Transcoder::getProgress() const noexcept
+{
+    if (m_player.hasStableState(Player::State::playing))
+    {
+        const auto& pipeline = m_player.getPipeline();
+        gint64 duration = 0;
+        if (pipeline->query_duration(Gst::FORMAT_TIME, duration) && (duration > 0))
+        {
+            gint64 position = 0;
+            if (pipeline->query_position(Gst::FORMAT_TIME, position) && (position > 0))
+            {
+                return static_cast<float>(position) / duration;
+            }
+        }
+    }
+
+    return 0.F;
+}
+
 void Transcoder::onPlayerPrerolled(Player& /*player*/)
 {
     std::cout << "Configuring transcoder..." << std::endl;
@@ -104,11 +123,11 @@ void Transcoder::onPlayerStopped(Player& /*player*/, bool isInterrupted) noexcep
 {
     if (isInterrupted)
     {
-        std::cout << "Transcoding interrupted before end" << std::endl;
+        std::cout << "Transcoding interrupted before end." << std::endl;
     }
     else
     {
-        std::cout << "Transcoding finished" << std::endl;
+        std::cout << "Transcoding finished." << std::endl;
     }
 
     m_mainLoop->quit();

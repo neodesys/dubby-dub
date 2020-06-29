@@ -25,12 +25,12 @@ class MkvEncoder final : public Encoder
   public:
     static constexpr const char* type = "mkv";
 
-  protected:
     const char* getType() const noexcept final
     {
         return MkvEncoder::type;
     }
 
+  protected:
     const char* getMimeType() const noexcept final;
     bool isVideoCodecAccepted(const char* codecType) const noexcept final;
     bool isAudioCodecAccepted(const char* codecType) const noexcept final;

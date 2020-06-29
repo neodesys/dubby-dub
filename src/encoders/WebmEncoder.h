@@ -25,12 +25,12 @@ class WebmEncoder final : public Encoder
   public:
     static constexpr const char* type = "webm";
 
-  protected:
     const char* getType() const noexcept final
     {
         return WebmEncoder::type;
     }
 
+  protected:
     const char* getMimeType() const noexcept final;
     bool isVideoCodecAccepted(const char* codecType) const noexcept final;
     bool isAudioCodecAccepted(const char* codecType) const noexcept final;

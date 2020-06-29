@@ -36,9 +36,14 @@ class Transcoder final : public IPlayerListener, public ISerializable
 
     void addEncoder(const std::shared_ptr<Encoder>& encoder);
     void clearEncoders();
+    const auto& getEncoders() const noexcept
+    {
+        return m_encoders;
+    }
 
     void transcode(const Glib::ustring& uri);
     void interruptTranscoding() noexcept;
+    float getProgress() const noexcept;
 
     void onPlayerPrerolled(Player& player) final;
     void onPlayerPlaying(Player& player) noexcept final;
