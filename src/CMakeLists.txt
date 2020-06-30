@@ -7,7 +7,9 @@ FetchContent_Declare(json
                      GIT_TAG v3.7.3)
 FetchContent_MakeAvailable(json)
 
-add_executable(${PROJECT_NAME} main.cpp exceptions.h ISerializable.h
+file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/version.cpp" "const char* dubbyDubVersion = \"${PROJECT_VERSION}\"; // NOLINT")
+add_executable(${PROJECT_NAME} "${CMAKE_CURRENT_BINARY_DIR}/version.cpp"
+                               main.cpp exceptions.h ISerializable.h
                                Transcoder.h Transcoder.cpp
                                player/IPlayerListener.h
                                player/Player.h player/Player.cpp

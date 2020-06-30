@@ -23,6 +23,8 @@
 #include <iomanip>
 #include <iostream>
 
+extern const char* dubbyDubVersion;
+
 namespace
 {
 constexpr const char* help = R"(
@@ -46,7 +48,8 @@ Usage:
                            source media, you should specify an output directory
                            in order to not override output files from previous
                            transcoding.
-    -h or --help:          displays this help content and quits.
+    -h or --help:          displays this help content and exits.
+    -v or --version:       displays version and exits.
 
   [File...]...[URI...]:    a list of source media files (paths can be relative
                            to current working directory) and/or URIs. All
@@ -132,10 +135,11 @@ Usage:
     - q<enter> to stop transcoding and quit the application
                (when interrupting transcoding you may have to wait a little
                bit that all buffers are correctly flushed to output files
-               before application effectively exists)
+               before application effectively exits, particularly if not
+               using hardware acceleration)
 
   Example:
-    dubby-dub -o ./ https://upload.wikimedia.org/wikipedia/commons/transcoded/c/c0/Big_Buck_Bunny_4K.webm/Big_Buck_Bunny_4K.webm.480p.vp9.webm -- {\"type\": \"transcoder\", \"encoders\": [{\"type\": \"webm\", \"width\": 640, \"video\": {\"type\": \"vp8\"}, \"audio\": {\"type\": \"vorbis\"}}]}
+    ./dubby-dub -o ./ https://upload.wikimedia.org/wikipedia/commons/transcoded/c/c0/Big_Buck_Bunny_4K.webm/Big_Buck_Bunny_4K.webm.480p.vp9.webm -- {\"type\": \"transcoder\", \"encoders\": [{\"type\": \"webm\", \"width\": 640, \"video\": {\"type\": \"vp8\"}, \"audio\": {\"type\": \"vorbis\"}}]}
 )";
 
 struct Config
@@ -143,8 +147,18 @@ struct Config
     Json transcoderConfig;
     std::string outputPath;
     std::vector<Glib::ustring> sourceUris;
-    bool displayHelp = false;
+    bool mustExit = false;
 };
+
+void printHelp()
+{
+    std::cout << help << std::endl;
+}
+
+void printVersion()
+{
+    std::cout << "dubby-dub version: " << dubbyDubVersion << std::endl;
+}
 
 Config parseConfig(int argc, char** argv)
 {
@@ -182,7 +196,14 @@ Config parseConfig(int argc, char** argv)
             }
             else if ((strcmp(argv[i], "-h") == 0) || (strcmp(argv[i], "--help") == 0)) // NOLINT
             {
-                cfg.displayHelp = true;
+                cfg.mustExit = true;
+                printHelp();
+                break;
+            }
+            else if ((strcmp(argv[i], "-v") == 0) || (strcmp(argv[i], "--version") == 0)) // NOLINT
+            {
+                cfg.mustExit = true;
+                printVersion();
                 break;
             }
         }
@@ -206,11 +227,6 @@ Config parseConfig(int argc, char** argv)
 
     return cfg;
 }
-
-void printHelp()
-{
-    std::cout << help << std::endl;
-}
 } // namespace
 
 int main(int argc, char* argv[])
@@ -218,9 +234,8 @@ int main(int argc, char* argv[])
     try
     {
         const Config config = parseConfig(argc, argv);
-        if (config.displayHelp)
+        if (config.mustExit)
         {
-            printHelp();
             return 0;
         }
 

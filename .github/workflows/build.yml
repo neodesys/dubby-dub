@@ -1,0 +1,20 @@
+name: Build dubby-dub
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build:
+    runs-on: ubuntu-20.04
+    steps:
+    - name: Install build dependencies
+      run: |
+        sudo apt-get update -qq
+        DEBIAN_FRONTEND=noninteractive sudo apt-get install -qq clang-format-10 clang-tidy-10 libgstreamermm-1.0-dev
+    - uses: actions/checkout@v2
+    - name: Configure project
+      run: cmake -S. -Bbuild
+    - name: Build project
+      run: cmake --build build
